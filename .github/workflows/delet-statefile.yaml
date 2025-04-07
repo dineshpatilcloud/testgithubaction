@@ -70,7 +70,7 @@ jobs:
       - name: Show deleted folders (PR Preview)
         run: |
           echo "⚠️ The following folders will be removed and their Terraform state will be destroyed:"
-          for folder in $CLEAN_FOLDERS; do
+          for folder in $(echo '${{ env.CLEAN_FOLDERS }}' | jq -r '.[]'); do
             echo "- $folder"
           done
 
@@ -87,7 +87,7 @@ jobs:
 
       - name: Terraform destroy for deleted folders
         run: |
-          for folder in $CLEAN_FOLDERS; do
+          for folder in $(echo '${{ env.CLEAN_FOLDERS }}' | jq -r '.[]'); do
             echo "Running Terraform destroy for $folder"
 
             cd "$folder" || continue
@@ -97,7 +97,7 @@ jobs:
 
       - name: Delete state file from GCS
         run: |
-          for folder in $CLEAN_FOLDERS; do
+          for folder in $(echo '${{ env.CLEAN_FOLDERS }}' | jq -r '.[]'); do
             echo "Deleting Terraform state for $parent_folder/$folder"
            # gcloud storage rm -r gs://${TF_BUCKET}/$folder || echo "Failed to delete state for $folder"
           done
