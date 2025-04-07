@@ -61,6 +61,9 @@ jobs:
             echo "CLEAN_FOLDERS=$formatted_folders" >> $GITHUB_ENV
           fi
 
+      - name: show all the github context
+        run: |
+          echo "${{ github }}"
       - name: Show deleted folders (PR Preview)
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
