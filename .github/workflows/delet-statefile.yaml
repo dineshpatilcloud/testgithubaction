@@ -61,43 +61,23 @@ jobs:
             echo "CLEAN_FOLDERS=$formatted_folders" >> $GITHUB_ENV
           fi
 
-  show-on-pr:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    needs: detect-deleted-projects
-
-    steps:
       - name: Show deleted folders (PR Preview)
         run: |
-          echo "⚠️ The following folders will be removed and their Terraform state will be destroyed:"
-          for folder in $(echo '${{ env.CLEAN_FOLDERS }}' | jq -r '.[]'); do
-            echo "- $folder"
-          done
-
-  destroy-on-merge:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    needs: detect-deleted-projects
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Terraform destroy for deleted folders
-        run: |
-          for folder in $(echo '${{ env.CLEAN_FOLDERS }}' | jq -r '.[]'); do
-            echo "Running Terraform destroy for $folder"
-
-            cd "$folder" || continue
-
-            cd -
-          done
-
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "⚠️ The following folders will be removed and their Terraform state will be destroyed:"
+            for folder in $(echo '${{ env.CLEAN_FOLDERS }}' | jq -r '.[]'); do
+              echo "- $folder"
+            done
+          else
+            echo "skipping as this is merge"
+          fi
       - name: Delete state file from GCS
         run: |
-          for folder in $(echo '${{ env.CLEAN_FOLDERS }}' | jq -r '.[]'); do
-            echo "Deleting Terraform state for $parent_folder/$folder"
-           # gcloud storage rm -r gs://${TF_BUCKET}/$folder || echo "Failed to delete state for $folder"
-          done
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "⚠️ The following folders will be removed and their Terraform state will be destroyed:"
+            for folder in $(echo '${{ env.CLEAN_FOLDERS }}' | jq -r '.[]'); do
+              echo "- $folder"
+            done
+          else
+            echo "skipping as this is PR"
+          fi
