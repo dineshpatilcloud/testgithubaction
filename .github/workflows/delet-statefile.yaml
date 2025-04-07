@@ -63,7 +63,7 @@ jobs:
 
       - name: show all the github context
         run: |
-          echo "${{ github }}"
+          echo "${{ toJson(github) }}"
       - name: Show deleted folders (PR Preview)
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
