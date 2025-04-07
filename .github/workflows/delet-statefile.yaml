@@ -23,21 +23,43 @@ jobs:
         id: detect
         run: |
           parent_folder="producers"
-          DELETED=$(git diff --name-only origin/main...HEAD | grep -oE '^[^/]+/' | sort -u)
-          echo "Deleted folders: $DELETED"
+          echo "Fetching deleted folders..."
 
-          # Check if folders still have files
-          CLEAN_FOLDERS=""
-          for folder in $DELETED; do
-            if [ -d "$parent_folder/$folder" ] && [ "$(ls -A $parent_folder/$folder 2>/dev/null)" ]; then
-              echo "Folder $folder still contains files. Skipping."
-            else
-              CLEAN_FOLDERS+="$folder "
-            fi
-          done
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "Comparing for PR with origin/main..."
+            deleted_folders=$(git diff --name-only --diff-filter=D origin/main | grep '/' | awk -F'/' '{print $2}' | sort -u | uniq)
+          else 
+            echo "Comparing for merge with origin/main..."
+            deleted_folders=$(git diff --name-only --diff-filter=D HEAD^ HEAD | grep '/' | awk -F'/' '{print $2}' | sort -u | uniq)
+          fi
 
-          echo "CLEAN_FOLDERS=$CLEAN_FOLDERS" >> $GITHUB_ENV
-          echo "Clean Folders: $CLEAN_FOLDERS"
+          if [[ -z "$deleted_folders" ]]; then
+            echo "No deleted folders found"
+            echo "deleted_folders=" >> $GITHUB_ENV
+          else
+            echo "Deleted folders or files from folders before filtering are as below:"
+            printf "%s\n" "${deleted_folders[@]}"
+            
+            valid_folders=()
+            for folder in $deleted_folders; do
+              if [ -d "$parent_folder/$folder" ]; then
+                if find "$parent_folder/$folder" -type f | grep -q .; then
+                  echo "Folder $folder still has files. Skipping deletion."
+                  continue
+                else
+                  echo "Folder $folder is empty"
+                fi
+              else
+                echo "Folder $folder is deleted and state file can be safely deleted"
+                valid_folders+=("$folder")
+              fi
+            done 
+
+            formatted_folders=$(printf '%s\n' "${valid_folders[@]}" | jq -R -s -c 'split("\n") | map(select(. != ""))')
+            echo "Deleted folders after filtering are as below:"
+            echo "$formatted_folders"
+            echo "CLEAN_FOLDERS=$formatted_folders" >> $GITHUB_ENV
+          fi
 
   show-on-pr:
     if: github.event_name == 'pull_request'
@@ -48,7 +70,7 @@ jobs:
       - name: Show deleted folders (PR Preview)
         run: |
           echo "⚠️ The following folders will be removed and their Terraform state will be destroyed:"
-          for folder in $CLEAN_FOLDERS; do
+          for folder in $(echo '${{ env.CLEAN_FOLDERS }}' | jq -r '.[]'); do
             echo "- $folder"
           done
 
@@ -65,7 +87,7 @@ jobs:
 
       - name: Terraform destroy for deleted folders
         run: |
-          for folder in $CLEAN_FOLDERS; do
+          for folder in $(echo '${{ env.CLEAN_FOLDERS }}' | jq -r '.[]'); do
             echo "Running Terraform destroy for $folder"
 
             cd "$folder" || continue
@@ -75,7 +97,7 @@ jobs:
 
       - name: Delete state file from GCS
         run: |
-          for folder in $CLEAN_FOLDERS; do
+          for folder in $(echo '${{ env.CLEAN_FOLDERS }}' | jq -r '.[]'); do
             echo "Deleting Terraform state for $parent_folder/$folder"
            # gcloud storage rm -r gs://${TF_BUCKET}/$folder || echo "Failed to delete state for $folder"
           done
