@@ -63,7 +63,15 @@ jobs:
 
       - name: show all the github context
         run: |
-          echo "${{ toJson(github) }}"
+          echo "${{ toJson(github) }}" > github-context.json
+          cat github-context.json # optional to verify context
+
+      - name: upload to artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-context-artifact
+          path: github-context.json
+
       - name: Show deleted folders (PR Preview)
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
