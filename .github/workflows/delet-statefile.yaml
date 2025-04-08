@@ -63,7 +63,6 @@ jobs:
 
       - name: show all the github context
         run: |
-          # echo "${{ toJson(github) }}" > github-context.json
           echo "event_name is  ${{ github.event_name }}"
           echo " ref_name is ${{ github.ref_name }}"
           echo " head_ref is ${{ github.head_ref }}"
